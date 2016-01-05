@@ -22,7 +22,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
 public class Gaps{
 
-    public static class TokenizerMapper extends Mapper<Object, Text, CompositeKeyWritable, IntWritable>{
+    public static class MyMapper extends Mapper<Object, Text, CompositeKeyWritable, IntWritable>{
 
         private static final CompositeKeyWritable k = new CompositeKeyWritable();
         private static final IntWritable v = new IntWritable();
@@ -46,8 +46,6 @@ public class Gaps{
             public void reduce(CompositeKeyWritable key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
                 int prev = -1;
                 for (IntWritable time : values) {
-                    //result.set(key.id + " " + key.time);
-                    //context.write(result, NullWritable.get());
                     if(prev != -1 && time.get() - prev != 1){
                         result.set("id: " + key.id + " " + prev + "-" + time.get());
                         context.write(result, NullWritable.get());
@@ -122,7 +120,7 @@ public class Gaps{
         Job job = Job.getInstance(conf, "Gaps");
         job.setJarByClass(Gaps.class);
 
-        job.setMapperClass(TokenizerMapper.class);
+        job.setMapperClass(MyMapper.class);
         job.setReducerClass(MyReducer.class);
 
         job.setSortComparatorClass(CompositeKeyOrderingComparator.class);

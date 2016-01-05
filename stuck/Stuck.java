@@ -14,7 +14,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
 public class Stuck {
 
-    public static class TokenizerMapper extends Mapper<Object, Text, Text, IntWritable>{
+    public static class MyMapper extends Mapper<Object, Text, Text, IntWritable>{
 
         private final static Text k = new Text();
         private final static IntWritable v = new IntWritable();
@@ -22,7 +22,7 @@ public class Stuck {
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException 
         {
             String[] line = value.toString().split(",");
-            k.set(line[0] + "," + line[1] + "," + line[2] + "," + line[3] + "," + line[4] + "," + line[5] + "," + line[6]);
+            k.set(line[0] + "," + line[1] + "," + line[2] + "," + line[6]);
             v.set((int) Float.parseFloat(line[7]));
             context.write(k,v);
         }
@@ -44,7 +44,7 @@ public class Stuck {
 
                 if(sum >= 300){
                     String[] line = key.toString().split(",");
-                    result.set("id: " + line[0] + " count = " + sum + ", max = " + max + ", min = " + min);
+                    result.set("id: " + line[0] + " count = " + sum + ", min = " + min + ", max = " + max);
                     context.write(result, NullWritable.get());
                 }
             }
@@ -54,7 +54,7 @@ public class Stuck {
         Configuration conf = new Configuration();
         Job job = Job.getInstance(conf, "Discovering stuck vehicles");
         job.setJarByClass(Stuck.class);
-        job.setMapperClass(TokenizerMapper.class);
+        job.setMapperClass(MyMapper.class);
         job.setReducerClass(MyReducer.class);
 
         job.setMapOutputKeyClass(Text.class);

@@ -22,7 +22,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
 public class Teleportation{
 
-    public static class TokenizerMapper extends Mapper<Object, Text, CompositeKeyWritable, CompositeValueWritable>{
+    public static class MyMapper extends Mapper<Object, Text, CompositeKeyWritable, CompositeValueWritable>{
 
         private static final CompositeKeyWritable k = new CompositeKeyWritable();
         private static final CompositeValueWritable v = new CompositeValueWritable();
@@ -173,7 +173,7 @@ public class Teleportation{
         Job job = Job.getInstance(conf, "Teleportation");
         job.setJarByClass(Teleportation.class);
 
-        job.setMapperClass(TokenizerMapper.class);
+        job.setMapperClass(MyMapper.class);
         job.setReducerClass(MyReducer.class);
 
         job.setSortComparatorClass(CompositeKeyOrderingComparator.class);
