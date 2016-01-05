@@ -20,68 +20,56 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
-public class LaneCount{
+public class Gaps{
 
-    public static class TokenizerMapper extends Mapper<Object, Text, CompositeKeyWritable, CompositeValueWritable>{
+    public static class TokenizerMapper extends Mapper<Object, Text, CompositeKeyWritable, IntWritable>{
 
         private static final CompositeKeyWritable k = new CompositeKeyWritable();
-        private static final CompositeValueWritable v = new CompositeValueWritable();
+        private static final IntWritable v = new IntWritable();
 
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException 
         {
             String[] line = value.toString().split(",");
 
             k.id = Integer.parseInt(line[0]);
-            k.time = (long) Float.parseFloat(line[7]);
-
-            v.x = Float.parseFloat(line[1]);
-            v.y = Float.parseFloat(line[2]);
-            v.s = Float.parseFloat(line[4]);
-            v.value = value.toString();
+            k.time = (int) Float.parseFloat(line[7]);
+            v.set(k.time);
 
             context.write(k,v);
         }
     }
 
-    public static class IntSumReducer
-            extends Reducer<CompositeKeyWritable,CompositeValueWritable,Text,NullWritable> {
+    public static class MyReducer
+            extends Reducer<CompositeKeyWritable,IntWritable,Text,NullWritable> {
             private Text result = new Text();
 
-            public void reduce(CompositeKeyWritable key, Iterable<CompositeValueWritable> values, Context context) throws IOException, InterruptedException {
-                CompositeValueWritable prev = null;
-                for (CompositeValueWritable t : values) {
-                    if(prev != null && d(t.x,t.y, prev.x, prev.y) > prev.s)
-                    {
-                        result.set("" + key.id);
+            public void reduce(CompositeKeyWritable key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
+                int prev = -1;
+                for (IntWritable time : values) {
+                    //result.set(key.id + " " + key.time);
+                    //context.write(result, NullWritable.get());
+                    if(prev != -1 && time.get() - prev != 1){
+                        result.set("id: " + key.id + " " + prev + "-" + time.get());
                         context.write(result, NullWritable.get());
-                        return;
                     }
-                    prev = t;
+                    prev = time.get();
                 }
-            }
-
-            public double d(float lat1, float lon1, float lat2, float lon2){
-                double p = Math.PI / 180;
-                double a = 0.5 - Math.cos((lat2 - lat1) * p)/2 + 
-                    Math.cos(lat1 * p) * Math.cos(lat2 * p) * 
-                    (1 - Math.cos((lon2 - lon1) * p))/2;
-                return 12742 * Math.asin(Math.sqrt(a)); // 2 * R; R = 6371 km
             }
     }
 
-    public static final class SortReducerByValuesPartitioner extends Partitioner<CompositeKeyWritable,Text> {
+    public static final class IdPartitioner extends Partitioner<CompositeKeyWritable,Text> {
         public int getPartition(CompositeKeyWritable key, Text value, int numPartitions) {
-            return key.id.hashCode() % numPartitions;
+            return key.id % numPartitions;
         }
     }
 
     public static final class CompositeKeyWritable implements WritableComparable<CompositeKeyWritable> {
-        private long time;
-        private Integer id;
+        private int time;
+        private int id;
 
         @Override
         public void readFields(DataInput in) throws IOException {
-            time = Long.parseLong(in.readUTF());
+            time = Integer.parseInt(in.readUTF());
             id = Integer.parseInt(in.readUTF());
         }
 
@@ -93,38 +81,9 @@ public class LaneCount{
 
         @Override
         public int compareTo(CompositeKeyWritable o){
-            int result = this.id.compareTo(o.id);
-            if(result == 0) result = -1 * Long.compare(this.time, o.time);
+            int result = Integer.compare(this.id, o.id);
+            if(result == 0) result = Integer.compare(this.time, o.time);
             return result;
-        }
-
-    }
-
-    public static final class CompositeValueWritable implements WritableComparable<CompositeValueWritable> {
-        private float x;
-        private float y;
-        private float s;
-        private String value;
-
-        @Override
-        public void readFields(DataInput in) throws IOException {
-            x = Float.parseFloat(in.readUTF());
-            y = Float.parseFloat(in.readUTF());
-            s = Float.parseFloat(in.readUTF());
-            value = in.readUTF();
-        }
-
-        @Override
-        public void write(DataOutput out) throws IOException {
-            out.writeUTF("" + x);
-            out.writeUTF("" + y);
-            out.writeUTF("" + s);
-            out.writeUTF(value);
-        }
-
-        @Override
-        public int compareTo(CompositeValueWritable o){
-            return this.value.compareTo(o.value);
         }
     }
 
@@ -138,7 +97,7 @@ public class LaneCount{
         public int compare(WritableComparable w1, WritableComparable w2){
             CompositeKeyWritable k1 = (CompositeKeyWritable) w1;
             CompositeKeyWritable k2 = (CompositeKeyWritable) w2;
-            return k1.id.compareTo(k2.id);
+            return Integer.compare(k1.id, k2.id);
         }
     }
 
@@ -152,26 +111,26 @@ public class LaneCount{
         public int compare(WritableComparable w1, WritableComparable w2){
             CompositeKeyWritable k1 = (CompositeKeyWritable) w1;
             CompositeKeyWritable k2 = (CompositeKeyWritable) w2;
-            int result = k1.id.compareTo(k2.id);
-            if(result == 0) result = -1 * Long.compare(k1.time, k2.time);
+            int result = Integer.compare(k1.id, k2.id);
+            if(result == 0) result = Long.compare(k1.time, k2.time);
             return result;
 
         }
     }
     public static void main(String[] args) throws Exception {
         Configuration conf = new Configuration();
-        Job job = Job.getInstance(conf, "Lane count");
-        job.setJarByClass(LaneCount.class);
+        Job job = Job.getInstance(conf, "Gaps");
+        job.setJarByClass(Gaps.class);
 
         job.setMapperClass(TokenizerMapper.class);
-        job.setReducerClass(IntSumReducer.class);
+        job.setReducerClass(MyReducer.class);
 
         job.setSortComparatorClass(CompositeKeyOrderingComparator.class);
         job.setGroupingComparatorClass(CompositeKeyGroupingComparator.class);
-        job.setPartitionerClass(SortReducerByValuesPartitioner.class);
+        job.setPartitionerClass(IdPartitioner.class);
 
         job.setMapOutputKeyClass(CompositeKeyWritable.class);
-        job.setMapOutputValueClass(CompositeValueWritable.class);
+        job.setMapOutputValueClass(IntWritable.class);
         job.setOutputKeyClass(Text.class);
         job.setOutputValueClass(NullWritable.class);
 
